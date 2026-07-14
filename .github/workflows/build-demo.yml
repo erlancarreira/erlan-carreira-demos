@@ -72,6 +72,14 @@ jobs:
           sandbox: workspace-write
           safety-strategy: drop-sudo
 
+      - name: Enhance with configured AI provider
+        if: contains(fromJSON('["anthropic","openrouter","groq","mistral","deepseek","xai","together","perplexity"]'), env.AI_PROVIDER)
+        continue-on-error: true
+        env:
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          AI_MODEL: ${{ vars.AI_MODEL }}
+        run: node .github/codex/scripts/enhance-with-ai.mjs
+
       - name: Verify enhancement or restore fallback
         shell: bash
         run: |
