@@ -1,0 +1,58 @@
+name: Build prospect demonstration
+
+on:
+  workflow_dispatch:
+    inputs:
+      request:
+        description: Structured public lead data
+        required: true
+        type: string
+
+concurrency:
+  group: prospect-demo-publisher
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build-demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Prepare isolated builder
+        env:
+          DEMO_REQUEST: ${{ inputs.request }}
+        run: |
+          node -e "const fs=require('fs'); const value=JSON.parse(process.env.DEMO_REQUEST); fs.writeFileSync('demo-request.json', JSON.stringify(value, null, 2));"
+          mkdir -p .demo-builder/src
+          cp .github/codex/builder/package.json .demo-builder/package.json
+          cp .github/codex/builder/vite.config.ts .demo-builder/vite.config.ts
+          cp .github/codex/builder/tsconfig.json .demo-builder/tsconfig.json
+          npm install --prefix .demo-builder --no-audit --no-fund
+
+      - name: Generate demonstration with Codex
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: .github/codex/prompts/build-demo.md
+          sandbox: workspace-write
+          safety-strategy: drop-sudo
+          output-file: codex-output.md
+
+      - name: Validate and stage public output
+        run: node .github/codex/scripts/finalize-demo.mjs
+
+      - name: Publish demonstration
+        run: |
+          slug="$(node -p "JSON.parse(require('fs').readFileSync('demo-request.json','utf8')).slug")"
+          git config user.name "erlan-carreira-demo-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -- "$slug"
+          git diff --cached --quiet && exit 0
+          git commit -m "demo: publish $slug"
+          git push origin HEAD:main
