@@ -4,7 +4,13 @@ const provider = String(process.env.AI_PROVIDER || '').toLowerCase();
 const apiKey = String(process.env.AI_API_KEY || '').trim();
 const model = String(process.env.AI_MODEL || '').trim();
 
-if (!apiKey || !model) throw new Error(`AI_API_KEY e AI_MODEL são obrigatórios para ${provider}.`);
+function useFallback(message) {
+  const safeMessage = String(message).replace(/[\r\n]+/g, ' ').slice(0, 800);
+  console.log(`::warning title=IA indisponível::${safeMessage} O fallback local será utilizado.`);
+  process.exit(0);
+}
+
+if (!apiKey || !model) useFallback(`DEFAULT_API_KEY e DEFAULT_AI_MODEL são obrigatórios para ${provider}.`);
 
 const endpoints = {
   openrouter: 'https://openrouter.ai/api/v1/chat/completions',
@@ -48,7 +54,7 @@ if (provider === 'anthropic') {
   });
 } else {
   const endpoint = endpoints[provider];
-  if (!endpoint) throw new Error(`Provedor não suportado: ${provider}.`);
+  if (!endpoint) useFallback(`Provedor não suportado: ${provider}.`);
   response = await fetch(endpoint, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
@@ -56,7 +62,7 @@ if (provider === 'anthropic') {
   });
 }
 
-if (!response.ok) throw new Error(`${provider} respondeu ${response.status}: ${(await response.text()).slice(0, 500)}`);
+if (!response.ok) useFallback(`${provider} respondeu ${response.status}: ${(await response.text()).slice(0, 500)}`);
 const payload = await response.json();
 const content = provider === 'anthropic'
   ? payload?.content?.find((item) => item?.type === 'text')?.text
