@@ -1,4 +1,5 @@
 name: Build prospect demonstration
+run-name: Demo ${{ fromJSON(inputs.request).slug }} · ${{ fromJSON(inputs.request).request_id }}
 
 on:
   workflow_dispatch:
